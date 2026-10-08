@@ -1,73 +1,136 @@
 import Link from "next/link";
+import { ArrowRight, Building, ClipboardList, Sparkles, TriangleAlert } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { Flash } from "@/components/flash";
-import { SubmitButton } from "@/components/submit-button";
-import { cardClass, inputClass, labelClass } from "@/components/ui";
+import { PageHeader } from "@/components/page-header";
+import { RequestRow } from "@/components/request-row";
+import { buttonClass, cardClass, linkClass } from "@/components/ui";
 import { requireManager } from "@/lib/auth";
-import { createBuilding } from "./actions";
+import {
+  REQUEST_SUMMARY_COLUMNS,
+  byPriorityThenDate,
+  type RequestSummary,
+} from "@/lib/manager-data";
 
-export default async function ManageHome({
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  href,
+}: {
+  label: string;
+  value: number;
+  icon: typeof Building;
+  tone: string;
+  href: string;
+}) {
+  return (
+    <Link href={href} className={`${cardClass} flex items-center gap-4 p-5 hover:border-indigo-300`}>
+      <span className={`flex h-11 w-11 items-center justify-center rounded-lg ${tone}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-2xl font-semibold text-slate-900">{value}</p>
+        <p className="text-sm text-slate-500">{label}</p>
+      </div>
+    </Link>
+  );
+}
+
+export default async function Dashboard({
   searchParams,
 }: {
   searchParams: { error?: string; message?: string };
 }) {
-  const { supabase, user } = await requireManager();
+  const { supabase, managedBuildingIds: buildingIds, fullName } = await requireManager();
+  const firstName = fullName?.split(" ")[0];
 
-  const { data: links } = await supabase
-    .from("building_managers")
-    .select("building_id")
-    .eq("user_id", user.id);
-  const buildingIds = (links ?? []).map((link) => link.building_id);
+  if (!buildingIds.length) {
+    return (
+      <>
+        <PageHeader title={firstName ? `Welcome, ${firstName}` : "Welcome"} />
+        <Flash searchParams={searchParams} />
+        <EmptyState
+          icon={Building}
+          title="Add your first building"
+          action={
+            <Link href="/manage/buildings/new" className={buttonClass}>
+              Add building
+            </Link>
+          }
+        >
+          Start by adding a building you manage. Then add its units, owners and tenants so
+          residents can report problems.
+        </EmptyState>
+      </>
+    );
+  }
 
-  const { data: buildings, error } = buildingIds.length
-    ? await supabase
-        .from("buildings")
-        .select("id, name, address, units(count)")
-        .in("id", buildingIds)
-        .order("name")
-    : { data: [], error: null };
+  const [{ data: buildings }, { data: activeData }] = await Promise.all([
+    supabase.from("buildings").select("id, units(count)").in("id", buildingIds),
+    supabase
+      .from("maintenance_requests")
+      .select(REQUEST_SUMMARY_COLUMNS)
+      .in("units.building_id", buildingIds)
+      .in("status", ["open", "in_progress"])
+      .limit(500),
+  ]);
+
+  const active = ((activeData ?? []) as unknown as RequestSummary[]).sort(byPriorityThenDate);
+  const urgent = active.filter((r) => r.priority === "urgent" || r.priority === "high").length;
+  const needsTriage = active.filter((r) => !r.ai_notes).length;
+  const unitCount = (buildings ?? []).reduce(
+    (sum, b) => sum + ((b.units as unknown as { count: number }[])[0]?.count ?? 0),
+    0
+  );
 
   return (
     <>
-      <h1 className="text-2xl font-bold">Your buildings</h1>
+      <PageHeader
+        title={firstName ? `Welcome back, ${firstName}` : "Dashboard"}
+        description="Here is what needs your attention across your buildings."
+      />
       <Flash searchParams={searchParams} />
-      {error && <p className="text-red-600">Error: {error.message}</p>}
 
-      {buildings?.length ? (
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {buildings.map((building) => (
-            <li key={building.id}>
-              <Link
-                href={`/manage/buildings/${building.id}`}
-                className={`${cardClass} block hover:border-blue-500`}
-              >
-                <p className="font-semibold">{building.name}</p>
-                <p className="text-sm text-gray-500">{building.address}</p>
-                <p className="mt-2 text-sm">
-                  {(building.units as unknown as { count: number }[])[0]?.count ?? 0} units
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-gray-500">You do not manage any buildings yet.</p>
-      )}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Open requests" value={active.length} icon={ClipboardList} tone="bg-indigo-50 text-indigo-600" href="/manage/requests" />
+        <StatCard label="High or urgent" value={urgent} icon={TriangleAlert} tone="bg-red-50 text-red-600" href="/manage/requests" />
+        <StatCard label="Need triage" value={needsTriage} icon={Sparkles} tone="bg-violet-50 text-violet-600" href="/manage/requests" />
+        <StatCard label={`Units in ${buildingIds.length} building${buildingIds.length === 1 ? "" : "s"}`} value={unitCount} icon={Building} tone="bg-slate-100 text-slate-600" href="/manage/buildings" />
+      </div>
 
       <section className={cardClass}>
-        <h2 className="mb-4 text-lg font-semibold">Add a building</h2>
-        <form action={createBuilding} className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor="name" className={labelClass}>Name</label>
-            <input id="name" name="name" required className={inputClass} />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="address" className={labelClass}>Address</label>
-            <input id="address" name="address" required className={inputClass} />
-          </div>
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <SubmitButton label="Add building" pendingLabel="Adding..." />
+            <h2 className="font-semibold text-slate-900">Needs attention</h2>
+            <p className="text-sm text-slate-500">Open requests, most urgent first</p>
           </div>
-        </form>
+          <Link href="/manage/requests" className={`${linkClass} inline-flex items-center gap-1 text-sm`}>
+            View all <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        {active.length ? (
+          <ul className="divide-y divide-slate-100">
+            {active.slice(0, 8).map((request) => (
+              <RequestRow
+                key={request.id}
+                href={`/manage/requests/${request.id}`}
+                title={request.title}
+                status={request.status}
+                priority={request.priority}
+                category={request.category}
+                submittedAt={request.submitted_at}
+                location={`${request.units?.buildings?.name ?? ""} · Unit ${request.units?.unit_no ?? ""}`}
+                needsTriage={!request.ai_notes}
+              />
+            ))}
+          </ul>
+        ) : (
+          <p className="px-5 py-10 text-center text-sm text-slate-500">
+            No open requests. Everything is taken care of.
+          </p>
+        )}
       </section>
     </>
   );

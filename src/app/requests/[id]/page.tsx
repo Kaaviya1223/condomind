@@ -1,16 +1,29 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Check } from "lucide-react";
 import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { Flash } from "@/components/flash";
-import { cardClass, linkClass } from "@/components/ui";
+import { PageHeader } from "@/components/page-header";
+import { cardClass } from "@/components/ui";
 import { requireResident } from "@/lib/auth";
 import { isUuid } from "@/lib/form";
 import { label } from "@/lib/labels";
 
-function formatDate(value: string | null) {
+const STEPS = [
+  { key: "open", label: "Submitted", hint: "Your manager has your request" },
+  { key: "in_progress", label: "In progress", hint: "Someone is working on it" },
+  { key: "resolved", label: "Resolved", hint: "The problem has been fixed" },
+] as const;
+
+function stepIndex(status: string | null) {
+  if (status === "in_progress") return 1;
+  if (status === "resolved" || status === "closed") return 2;
+  return 0;
+}
+
+function formatDateTime(value: string | null) {
   return value
     ? new Date(value).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })
-    : "–";
+    : null;
 }
 
 export default async function ResidentRequestPage({
@@ -34,42 +47,77 @@ export default async function ResidentRequestPage({
     unit_no: string;
     buildings: { name: string } | null;
   } | null;
+  const current = stepIndex(request.status);
 
   return (
     <>
-      <div>
-        <Link href="/requests" className={`${linkClass} text-sm`}>
-          ← My requests
-        </Link>
-        <h1 className="mt-2 text-2xl font-bold">{request.title}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+      <PageHeader
+        title={request.title}
+        back={{ href: "/requests", label: "Your requests" }}
+        description={unit ? `${unit.buildings?.name} · Unit ${unit.unit_no}` : undefined}
+      >
+        <div className="flex flex-wrap gap-2">
           <StatusBadge status={request.status} />
           <PriorityBadge priority={request.priority} />
-          {unit && <span>{unit.buildings?.name} · Unit {unit.unit_no}</span>}
         </div>
-      </div>
+      </PageHeader>
       <Flash searchParams={searchParams} />
 
-      <section className={cardClass}>
-        <p className="whitespace-pre-line text-sm">
-          {request.description || "No description given."}
+      <section className={`${cardClass} p-6`}>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Progress</h2>
+        <ol className="mt-5 grid gap-6 sm:grid-cols-3">
+          {STEPS.map((step, index) => {
+            const done = index < current || (index === current && index === STEPS.length - 1);
+            const active = index === current && !done;
+            return (
+              <li key={step.key} className="flex items-start gap-3">
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                    done
+                      ? "bg-indigo-600 text-white"
+                      : active
+                        ? "border-2 border-indigo-600 bg-white text-indigo-600"
+                        : "border-2 border-slate-200 bg-white text-slate-400"
+                  }`}
+                >
+                  {done ? <Check className="h-4 w-4" /> : index + 1}
+                </span>
+                <div>
+                  <p className={`text-sm font-medium ${done || active ? "text-slate-900" : "text-slate-400"}`}>
+                    {step.label}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {index === 0
+                      ? formatDateTime(request.submitted_at) ?? step.hint
+                      : index === 2 && request.resolved_at
+                        ? formatDateTime(request.resolved_at)
+                        : step.hint}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        {request.status === "closed" && (
+          <p className="mt-5 text-sm text-slate-500">This request has been closed by your manager.</p>
+        )}
+      </section>
+
+      <section className={`${cardClass} p-6`}>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Your report</h2>
+        <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-800">
+          {request.description || "No details given."}
         </p>
-        <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <dl className="mt-5 grid gap-4 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-gray-500">Submitted</dt>
-            <dd>{formatDate(request.submitted_at)}</dd>
+            <dt className="text-slate-500">Category</dt>
+            <dd className="font-medium text-slate-900">{label(request.category) || "Not set yet"}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Resolved</dt>
-            <dd>{formatDate(request.resolved_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Category</dt>
-            <dd>{label(request.category) || "Not set yet"}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Vendor</dt>
-            <dd>{request.assigned_vendor_id ? "Assigned" : "Not assigned yet"}</dd>
+            <dt className="text-slate-500">Contractor</dt>
+            <dd className="font-medium text-slate-900">
+              {request.assigned_vendor_id ? "Assigned" : "Not assigned yet"}
+            </dd>
           </div>
         </dl>
       </section>

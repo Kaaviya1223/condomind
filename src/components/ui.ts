@@ -1,17 +1,19 @@
 export const inputClass =
-  "w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none";
+  "block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
-export const labelClass = "block text-sm font-medium";
+export const labelClass = "block text-sm font-medium text-slate-700";
 
-export const buttonClass =
-  "rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60";
+export const hintClass = "text-xs text-slate-500";
 
-export const secondaryButtonClass =
-  "rounded border border-gray-400 px-3 py-1.5 text-sm hover:bg-gray-500/10 disabled:opacity-60";
+const buttonBase =
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-wait disabled:opacity-60";
 
-export const dangerButtonClass =
-  "rounded border border-red-500 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/10 disabled:opacity-60";
+export const buttonClass = `${buttonBase} bg-indigo-600 text-white shadow-sm hover:bg-indigo-700`;
 
-export const cardClass = "rounded-lg border border-gray-500/30 p-4";
+export const secondaryButtonClass = `${buttonBase} border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50`;
 
-export const linkClass = "text-blue-600 underline-offset-2 hover:underline";
+export const dangerButtonClass = `${buttonBase} border border-red-200 bg-white text-red-600 hover:bg-red-50`;
+
+export const cardClass = "rounded-xl border border-slate-200 bg-white shadow-sm";
+
+export const linkClass = "font-medium text-indigo-600 hover:text-indigo-700 hover:underline";

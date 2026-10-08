@@ -1,4 +1,4 @@
-import { AppHeader } from "@/components/app-header";
+import { ResidentShell } from "@/components/resident-shell";
 import { requireResident } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +11,12 @@ export default async function ResidentLayout({
   const { user, role, fullName } = await requireResident();
 
   return (
-    <>
-      <AppHeader email={user.email ?? ""} fullName={fullName} role={role} />
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">{children}</main>
-    </>
+    <ResidentShell
+      email={user.email ?? ""}
+      fullName={fullName}
+      roleLabel={role === "owner" ? "Owner" : "Tenant"}
+    >
+      {children}
+    </ResidentShell>
   );
 }

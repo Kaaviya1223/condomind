@@ -1,3 +1,5 @@
+import { CircleCheck, TriangleAlert } from "lucide-react";
+
 export function Flash({
   searchParams,
 }: {
@@ -5,16 +7,18 @@ export function Flash({
 }) {
   if (searchParams.error) {
     return (
-      <p className="rounded bg-red-50 p-3 text-sm text-red-700">
-        {searchParams.error}
-      </p>
+      <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>{searchParams.error}</p>
+      </div>
     );
   }
   if (searchParams.message) {
     return (
-      <p className="rounded bg-green-50 p-3 text-sm text-green-700">
-        {searchParams.message}
-      </p>
+      <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>{searchParams.message}</p>
+      </div>
     );
   }
   return null;

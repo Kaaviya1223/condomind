@@ -30,7 +30,7 @@ export async function createBuilding(formData: FormData) {
   const address = text(formData, "address");
 
   if (!name || !address) {
-    fail("/manage", "Name and address are required.");
+    fail("/manage/buildings/new", "Name and address are required.");
   }
 
   const { data, error } = await supabase.rpc("create_building", {
@@ -39,10 +39,10 @@ export async function createBuilding(formData: FormData) {
   });
 
   if (error || !data) {
-    fail("/manage", error?.message ?? "Could not create the building.");
+    fail("/manage/buildings/new", error?.message ?? "Could not create the building.");
   }
 
-  revalidatePath("/manage");
+  revalidatePath("/manage", "layout");
   redirect(`/manage/buildings/${data}`);
 }
 
@@ -51,10 +51,11 @@ export async function updateBuilding(formData: FormData) {
   const id = uuidField(formData, "id");
   const name = text(formData, "name");
   const address = text(formData, "address");
-  const path = `/manage/buildings/${id}`;
+  if (!id) fail("/manage/buildings", NO_ACCESS);
 
-  if (!id) fail("/manage", NO_ACCESS);
-  if (!name || !address) fail(path, "Name and address are required.");
+  const path = `/manage/buildings/${id}`;
+  const tabPath = `${path}?tab=settings`;
+  if (!name || !address) fail(tabPath, "Name and address are required.");
 
   const { data, error } = await supabase
     .from("buildings")
@@ -62,17 +63,17 @@ export async function updateBuilding(formData: FormData) {
     .eq("id", id)
     .select("id");
 
-  if (error) fail(path, error.message);
-  if (!data?.length) fail(path, NO_ACCESS);
+  if (error) fail(tabPath, error.message);
+  if (!data?.length) fail(tabPath, NO_ACCESS);
 
   revalidatePath(path);
-  succeed(path, "Building saved.");
+  succeed(tabPath, "Building saved.");
 }
 
 export async function deleteBuilding(formData: FormData) {
   const { supabase } = await requireManager();
   const id = uuidField(formData, "id");
-  if (!id) fail("/manage", NO_ACCESS);
+  if (!id) fail("/manage/buildings", NO_ACCESS);
 
   const { data, error } = await supabase
     .from("buildings")
@@ -80,11 +81,11 @@ export async function deleteBuilding(formData: FormData) {
     .eq("id", id)
     .select("id");
 
-  if (error) fail(`/manage/buildings/${id}`, error.message);
-  if (!data?.length) fail("/manage", NO_ACCESS);
+  if (error) fail(`/manage/buildings/${id}?tab=settings`, error.message);
+  if (!data?.length) fail("/manage/buildings", NO_ACCESS);
 
-  revalidatePath("/manage");
-  succeed("/manage", "Building deleted.");
+  revalidatePath("/manage", "layout");
+  succeed("/manage/buildings", "Building deleted.");
 }
 
 // Units
@@ -101,7 +102,7 @@ function unitFields(formData: FormData) {
 export async function createUnit(formData: FormData) {
   const { supabase } = await requireManager();
   const buildingId = uuidField(formData, "building_id");
-  if (!buildingId) fail("/manage", NO_ACCESS);
+  if (!buildingId) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/buildings/${buildingId}`;
   const fields = unitFields(formData);
@@ -120,7 +121,7 @@ export async function createUnit(formData: FormData) {
 export async function updateUnit(formData: FormData) {
   const { supabase } = await requireManager();
   const id = uuidField(formData, "id");
-  if (!id) fail("/manage", NO_ACCESS);
+  if (!id) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/units/${id}`;
   const fields = unitFields(formData);
@@ -143,7 +144,7 @@ export async function deleteUnit(formData: FormData) {
   const { supabase } = await requireManager();
   const id = uuidField(formData, "id");
   const buildingId = uuidField(formData, "building_id");
-  if (!id || !buildingId) fail("/manage", NO_ACCESS);
+  if (!id || !buildingId) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/buildings/${buildingId}`;
   const { data, error } = await supabase
@@ -183,7 +184,7 @@ export async function saveResident(formData: FormData) {
   const table = oneOf(text(formData, "table"), RESIDENT_TABLES);
   const unitId = uuidField(formData, "unit_id");
   const id = uuidField(formData, "id");
-  if (!table || !unitId) fail("/manage", NO_ACCESS);
+  if (!table || !unitId) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/units/${unitId}`;
   const fields = residentFields(formData, table);
@@ -216,7 +217,7 @@ export async function deleteResident(formData: FormData) {
   const table = oneOf(text(formData, "table"), RESIDENT_TABLES);
   const unitId = uuidField(formData, "unit_id");
   const id = uuidField(formData, "id");
-  if (!table || !unitId || !id) fail("/manage", NO_ACCESS);
+  if (!table || !unitId || !id) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/units/${unitId}`;
   const { data, error } = await supabase
@@ -239,43 +240,45 @@ export async function inviteManager(formData: FormData) {
   const { supabase } = await requireManager();
   const buildingId = uuidField(formData, "building_id");
   const email = text(formData, "email");
-  if (!buildingId) fail("/manage", NO_ACCESS);
+  if (!buildingId) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/buildings/${buildingId}`;
-  if (!email) fail(path, "Email is required.");
+  const tabPath = `${path}?tab=managers`;
+  if (!email) fail(tabPath, "Email is required.");
 
   const { error } = await supabase.rpc("invite_manager", {
     p_email: email,
     p_building_id: buildingId,
   });
 
-  if (error) fail(path, error.message);
+  if (error) fail(tabPath, error.message);
 
   revalidatePath(path);
-  succeed(path, `${email} is now a manager of this building.`);
+  succeed(tabPath, `${email} is now a manager of this building.`);
 }
 
 export async function removeManager(formData: FormData) {
   const { supabase, user } = await requireManager();
   const buildingId = uuidField(formData, "building_id");
   const userId = uuidField(formData, "user_id");
-  if (!buildingId || !userId) fail("/manage", NO_ACCESS);
+  if (!buildingId || !userId) fail("/manage/buildings", NO_ACCESS);
 
   const path = `/manage/buildings/${buildingId}`;
+  const tabPath = `${path}?tab=managers`;
   const { error } = await supabase.rpc("remove_manager", {
     p_user_id: userId,
     p_building_id: buildingId,
   });
 
-  if (error) fail(path, error.message);
+  if (error) fail(tabPath, error.message);
 
   if (userId === user.id) {
-    revalidatePath("/manage");
-    succeed("/manage", "You no longer manage that building.");
+    revalidatePath("/manage", "layout");
+    succeed("/manage/buildings", "You no longer manage that building.");
   }
 
   revalidatePath(path);
-  succeed(path, "Manager removed.");
+  succeed(tabPath, "Manager removed.");
 }
 
 // Maintenance requests
