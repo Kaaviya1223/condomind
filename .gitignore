@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Local tooling
+.claude/
+CLAUDE.md
+
+# Logs and OS files
+*.log
+npm-debug.log*
+.DS_Store
+
+# Supabase local files
+supabase/.temp/
